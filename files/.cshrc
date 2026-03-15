@@ -1,7 +1,7 @@
 #!/bin/csh -X
 #.cshrc file:    1998-10-02
 # last revision: 2024-09-29
-# author:        Murray Altheim
+# author:        Ichiro Furusato
 
 setenv USER_NAME pi
 
