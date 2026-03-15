@@ -1,0 +1,87 @@
+- name: Setup KRZOS Raspberry Pi
+  hosts: all
+  become: yes
+  tasks:
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: yes
+#       upgrade: yes      # equivalent to sudo apt update
+        upgrade: full     # equivalent to sudo apt upgrade
+
+    - name: Install essential packages
+      apt:
+        name:
+          - git
+          - vim
+          - tcsh
+          - i2c-tools
+          - python3-pip
+          - python3-colorama
+        state: present
+
+    - name: Set hostname
+      hostname:
+        name: krzos-pi
+
+    - name: Update /etc/hosts with hostname
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1'
+        line: '127.0.1.1       krzos-pi'
+
+    - name: Copy dotfiles to pi home
+      copy:
+        src: files/{{ item }}
+        dest: /home/pi/{{ item }}
+        owner: pi
+        group: pi
+        mode: '0644'
+      loop:
+        - .aliases
+        - .cshrc
+        - .dir_colors
+        - .LSCOLORS
+        - .prompt
+        - .vimrc
+
+    - name: Copy motd
+      copy:
+        src: files/motd
+        dest: /etc/motd
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Set tcsh as default shell for pi user
+      user:
+        name: pi
+        shell: /bin/tcsh
+
+    - name: Ensure .ssh directory exists
+      file:
+        path: /home/pi/.ssh
+        state: directory
+        owner: pi
+        group: pi
+        mode: '0700'
+
+    - name: Copy GitHub SSH key to Pi
+      copy:
+        src: ~/.ssh/id_rsa
+        dest: /home/pi/.ssh/id_rsa
+        owner: pi
+        group: pi
+        mode: '0600'
+
+    - name: Install rshell via pip3
+      pip:
+        name: rshell
+        extra_args: --break-system-packages
+
+    - name: Add user to dialout group
+      user:
+        name: "{{ ansible_user }}"  # Uses the SSH login user (pi)
+        groups: dialout
+        append: yes
+
+#EOF

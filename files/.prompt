@@ -1,0 +1,19 @@
+#!/bin/csh -X
+# sets tcsh prompt to something interesting
+# date:          2009-11-04
+# last revision: 2025-08-16
+# author:        Murray Altheim
+
+if ( $?tcsh ) then
+    # tcsh-specific commands:
+    set prompt="\
+ %{\033[3;32m%}(\!)%B %m: %b %{\033[35m%} %/%}\
+ %{\033[0;37m%}▶%{\033[0m%} "
+endif
+
+# %{\033[0;37m%}◁▶%{\033[0m%} "
+# colors set by *my* terminal:
+# bold 3;31=orange; 32=lavender; 33=magenta; 34=pale cyan; 35=yellow; 36=cyan; 37=green
+# dark 2;31=red ; 32=green ; 33=olive ; 34=blue ; 35=magenta ; 36=cyan ; 37=gray
+# bold 0;31=orange ; 32=violet ; 33=magenta ; 34=diluted cyan ; 35=yellow ; 36=cyan ; 37=light green
+# printf "%6s \033[1m  in bold \033[0m "

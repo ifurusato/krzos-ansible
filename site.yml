@@ -1,0 +1,4 @@
+# site.yml
+- import_playbook: setup-pi.yml
+- import_playbook: enable-rsyslog.yml
+- import_playbook: install-krzos.yml

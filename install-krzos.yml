@@ -1,0 +1,23 @@
+- name: Install KRZOS
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure workspaces directory exists
+      file:
+        path: /home/pi/workspaces/workspace-krzos
+        state: directory
+        owner: pi
+        group: pi
+        mode: '0755'
+
+    - name: Clone KRZOS repo
+      git:
+        repo: 'git@github.com:ifurusato/krzos.git'
+        dest: /home/pi/workspaces/workspace-krzos/krzos
+        version: main
+        force: yes
+        accept_hostkey: yes
+      become: no  # Must run as pi, not root, to use pi's SSH key
+      # Requires SSH key to be present - run setup-pi.yml first
+
+#EOF

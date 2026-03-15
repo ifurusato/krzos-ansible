@@ -1,0 +1,55 @@
+- name: Enable classic text logging (rsyslog)
+  hosts: all
+  become: yes
+  tasks:
+
+    - name: Install rsyslog
+      apt:
+        name: rsyslog
+        state: present
+        update_cache: yes
+
+    - name: Ensure rsyslog service is enabled and started
+      systemd:
+        name: rsyslog
+        enabled: yes
+        state: started
+
+    - name: Configure journald for volatile, minimal operation
+      copy:
+        dest: /etc/systemd/journald.conf
+        content: |
+          [Journal]
+          Storage=volatile
+          RuntimeMaxUse=10M
+          RuntimeMaxFileSize=1M
+          SystemMaxUse=0
+          ForwardToSyslog=yes
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Restart systemd-journald
+      systemd:
+        name: systemd-journald
+        state: restarted
+
+    - name: Show rsyslog status (first 10 lines)
+      debug:
+        msg: "{{ rsyslog_status.stdout_lines[0:10] }}"
+      command: systemctl --no-pager --full status rsyslog
+      register: rsyslog_status
+      ignore_errors: yes
+
+    - debug:
+        msg: "{{ rsyslog_status.stdout_lines[0:10] }}"
+
+    - name: Show current journald disk usage
+      debug:
+        msg: "{{ journal_usage.stdout }}"
+      command: journalctl --disk-usage
+      register: journal_usage
+      ignore_errors: yes
+
+    - debug:
+        msg: "{{ journal_usage.stdout }}"
