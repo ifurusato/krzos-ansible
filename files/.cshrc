@@ -1,7 +1,9 @@
 #!/bin/csh -X
 #.cshrc file:    1998-10-02
-# last revision: 2024-09-29
+# last revision: 2026-03-16
 # author:        Ichiro Furusato
+
+set INIT_ENABLED = 0  # if enabled cd to krzos and run diagnostics
 
 setenv USER_NAME pi
 
@@ -31,38 +33,36 @@ if ( -f ~/.prompt ) source ~/.prompt
 
 umask 022
 
-set INIT_ENABLED = 0
 if ( $INIT_ENABLED ) then
+
+    set RED    = "\033[31m"
+    set GREEN  = "\033[32m"
+    set CYAN   = "\033[36m"
+    set RESET  = "\033[0m"
+
     if ($?prompt) then
-
-        echo "-- running .cshrc for user: `whoami`"
-
+        echo "${CYAN}-- running .cshrc for user: `whoami`${RESET}"
         if ($?SSH_CONNECTION) then
-            echo "-- SSH connection detected via SSH_CONNECTION."
-
-            # Get the current user
+            echo "${CYAN}-- SSH connection detected via SSH_CONNECTION.${RESET}"
+            # get current user
             set user = `whoami`
-
-            # Count number of pts sessions for this user (remote SSH sessions)
+            # count number of pts sessions for this user (remote SSH sessions)
             set n_sessions = `who | grep "$user" | grep -c 'pts/'`
-
-            echo "Found $n_sessions remote login(s)."
-
+            echo "${CYAN}-- found $n_sessions remote login(s).${RESET}"
             if ($n_sessions == 1) then
-                echo "-- running init.py for first SSH session…"
+                echo "${GREEN}-- running diagnostics.py for first SSH session…${RESET}"
                 cd ~/workspaces/workspace-krzos/krzos/
-                ./init.py
+                ./diagnostics.py
             else
-              echo "-- cd krzos workspace…"
+              echo "${CYAN}-- cd krzos workspace…${RESET}"
               cd ~/workspaces/workspace-krzos/krzos/
-
             endif
         else
             set login_source = "`who am i`"
             if ("$login_source" =~ *"pts/"*) then
-                echo "-- SSH not detected via SSH_CONNECTION, but pts/ terminal suggests remote login."
+                echo "${RED}-- SSH not detected via SSH_CONNECTION, but pts/ terminal suggests remote login.${RESET}"
             else
-                echo "-- local or console login."
+                echo "${GREEN}-- local or console login.${RESET}"
             endif
         endif
     endif
