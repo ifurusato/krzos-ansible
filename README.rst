@@ -209,6 +209,10 @@ Or run individual playbooks as needed:
     ansible-playbook -i inventory.yml enable-rsyslog.yml
     ansible-playbook -i inventory.yml install-krzos.yml
 
+If you want to set up a Raspberry Pi but not clone the krzos github repository,
+you can either comment out or delete that last line. Or modify that playbook to
+clone a different repo.
+
 To do a dry run without making any changes:
 
 .. code-block:: bash
@@ -219,6 +223,7 @@ To do a dry run without making any changes:
 
 Playbook Summary
 ================
+
 - **setup-pi.yml** — updates apt, installs system packages, copies dotfiles,
   sets hostname, sets tcsh as default shell, copies SSH key, installs rshell,
   adds pi user to dialout group.
