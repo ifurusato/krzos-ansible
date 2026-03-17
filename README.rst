@@ -5,12 +5,20 @@ the setup of a Raspberry Pi running the KRZOS robot software.
 
 It handles:
 
-- Deploying system packages and Python libraries
-- Copying custom home directory dotfiles
-- Configuring the system hostname and logging
-- Disabling unnecessary services for headless operation
-- Cloning the KRZOS GitHub repository
-- Configuring SSH keys for GitHub access
+- Installing system packages and Python libraries (git, vim, tcsh, i2c-tools, rshell, etc.)
+- Copying custom home directory dotfiles and shell configuration
+- Setting system hostname and configuring classic text-based logging (rsyslog)
+- Enabling hardware interfaces (I2C, SPI, Serial, Camera) and auto-login
+- Configuring SSH key authentication for Ansible access
+- Copying GitHub SSH keys for repository access
+- Configuring passwordless sudo
+- Disabling unnecessary services for headless operation (audio, desktop, Bluetooth, Avahi, ModemManager)
+- Expanding filesystem to use full SD card capacity
+- Optionally cloning the KRZOS GitHub repository into the workspace
+
+Regarding the latter item, you can choose to either not perform the task or change the
+chosen GitHub repository to install.
+
 
 Repository Structure
 ====================
