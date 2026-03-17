@@ -1,3 +1,14 @@
+---
+# Copyright 2026 by Ichiro Furusato. All rights reserved. This file is
+# part of the krzos-ansible project, released under the MIT License.
+# Please see the LICENSE file included as part of this package.
+#
+# author:   Ichiro Furusato
+# created:  2026-03-18
+# modified: 2026-03-18
+#
+# setup-pi.yml — Initial setup for KRZOS Raspberry Pi (headless configuration)
+
 - name: Setup KRZOS Raspberry Pi
   hosts: all
   become: yes
@@ -5,8 +16,17 @@
     - name: Update apt cache and upgrade packages
       apt:
         update_cache: yes
-#       upgrade: yes      # equivalent to sudo apt update
-        upgrade: full     # equivalent to sudo apt upgrade
+        upgrade: full
+      register: apt_result
+
+    - name: Enable passwordless sudo for pi user
+      copy:
+        content: "pi ALL=(ALL) NOPASSWD: ALL\n"
+        dest: /etc/sudoers.d/010_pi-nopasswd
+        owner: root
+        group: root
+        mode: '0440'
+        validate: '/usr/sbin/visudo -cf %s'
 
     - name: Install essential packages
       apt:
@@ -18,16 +38,19 @@
           - python3-pip
           - python3-colorama
         state: present
+      register: packages_result
 
     - name: Set hostname
       hostname:
         name: krzos-pi
+      register: hostname_result
 
     - name: Update /etc/hosts with hostname
       lineinfile:
         path: /etc/hosts
         regexp: '^127\.0\.1\.1'
         line: '127.0.1.1       krzos-pi'
+      register: hosts_result
 
     - name: Copy dotfiles to pi home
       copy:
@@ -43,6 +66,7 @@
         - .LSCOLORS
         - .prompt
         - .vimrc
+      register: dotfiles_result
 
     - name: Copy motd
       copy:
@@ -51,11 +75,13 @@
         owner: root
         group: root
         mode: '0644'
+      register: motd_result
 
     - name: Set tcsh as default shell for pi user
       user:
         name: pi
         shell: /bin/tcsh
+      register: shell_result
 
     - name: Ensure .ssh directory exists
       file:
@@ -65,23 +91,68 @@
         group: pi
         mode: '0700'
 
-    - name: Copy GitHub SSH key to Pi
-      copy:
-        src: ~/.ssh/id_rsa
-        dest: /home/pi/.ssh/id_rsa
+    - name: Add SSH public key to authorized_keys
+      authorized_key:
+        user: pi
+        state: present
+        key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+      register: ssh_key_result
+
+    - name: Generate SSH key for GitHub (if not exists)
+      openssh_keypair:
+        path: /home/pi/.ssh/id_rsa_github
+        type: rsa
+        size: 4096
         owner: pi
         group: pi
         mode: '0600'
+        comment: "pi@krzos-pi"
+      register: github_key
+
+    - name: Display GitHub public key for adding to GitHub
+      debug:
+        msg: 
+          - "=== ADD THIS PUBLIC KEY TO GITHUB ==="
+          - "{{ github_key.public_key }}"
+          - ""
+          - "Go to: https://github.com/ifurusato/krzos/settings/keys"
+          - "Click 'Add deploy key'"
+          - "Paste the key above"
+          - "Check 'Allow write access' if you need to push"
+      when: github_key.changed
+
+    - name: Configure git to use GitHub SSH key
+      community.general.git_config:
+        name: core.sshCommand
+        value: 'ssh -i /home/pi/.ssh/id_rsa_github -o IdentitiesOnly=yes'
+        scope: global
+      become_user: pi
 
     - name: Install rshell via pip3
       pip:
         name: rshell
         extra_args: --break-system-packages
+      register: pip_result
 
     - name: Add user to dialout group
       user:
-        name: "{{ ansible_user }}"  # Uses the SSH login user (pi)
+        name: "{{ ansible_user }}"
         groups: dialout
         append: yes
+      register: group_result
 
-#EOF
+    - name: Reboot if changes were made
+      reboot:
+        msg: "Rebooting after initial setup"
+        reboot_timeout: 300
+      when: >
+        apt_result.changed or
+        packages_result.changed or
+        hostname_result.changed or
+        hosts_result.changed or
+        dotfiles_result.changed or
+        shell_result.changed or
+        ssh_key_result.changed or
+        pip_result.changed or
+        group_result.changed
+

@@ -1,0 +1,129 @@
+---
+# Copyright 2026 by Ichiro Furusato. All rights reserved. This file is
+# part of the krzos-ansible project, released under the MIT License.
+# Please see the LICENSE file included as part of this package.
+#
+# author:   Ichiro Furusato
+# created:  2026-03-18
+# modified: 2026-03-18
+#
+# disable-unnecessary-services.yml — disables and/or purges services
+# unnecessary on a headless Pi such as x11, audio/visual, bluetooth.
+
+- name: Disable unnecessary services on headless Raspberry Pi
+  hosts: all
+  become: yes
+  vars:
+    audio_services:
+      - pulseaudio.service
+      - pulseaudio.socket
+      - pipewire.service
+      - pipewire.socket
+      - pipewire-pulse.service
+      - pipewire-pulse.socket
+      - wireplumber.service
+      - alsa-state.service
+      - alsa-restore.service
+    
+    services_to_mask:
+      - pipewire.service
+      - pipewire-pulse.service
+      - wireplumber.service
+      - pulseaudio.service
+      - avahi-daemon.service
+      - avahi-daemon.socket
+    
+    packages_to_remove:
+      - x11-common
+      - raspi-ui-mods
+      - lxde-*
+      - lxpanel-*
+      - pulseaudio*
+      - pipewire*
+      - alsa-utils
+      - sonic-pi
+      - python3-pygame
+      - python3-pyqt5*
+      - python3-pyqt6*
+      - vlc
+      - bluez
+      - pi-bluetooth
+      - pulseaudio-module-bluetooth
+      - bluetooth
+      - blueman
+      - avahi-daemon
+      - modemmanager
+
+  tasks:
+    - name: Stop and disable audio services
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop: "{{ audio_services }}"
+      failed_when: false
+      register: audio_disabled
+
+    - name: Stop and disable Avahi services
+      systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: no
+      loop:
+        - avahi-daemon.service
+        - avahi-daemon.socket
+      failed_when: false
+
+    - name: Mask audio and Avahi services to prevent auto-restart
+      systemd:
+        name: "{{ item }}"
+        masked: yes
+      loop: "{{ services_to_mask }}"
+      failed_when: false
+
+    - name: Stop user-level mpris-proxy service
+      become_user: pi
+      systemd:
+        name: mpris-proxy.service
+        state: stopped
+        scope: user
+      failed_when: false
+
+    - name: Mask user-level mpris-proxy service
+      become_user: pi
+      systemd:
+        name: mpris-proxy.service
+        masked: yes
+        scope: user
+      failed_when: false
+
+    - name: Purge audio and desktop packages
+      apt:
+        name: "{{ packages_to_remove }}"
+        state: absent
+        purge: yes
+      register: purge_result
+
+    - name: Autoremove orphaned dependencies
+      apt:
+        autoremove: yes
+        purge: yes
+      become: yes
+
+    - name: Clean apt cache
+      apt:
+        autoclean: yes
+
+    - name: Display summary
+      debug:
+        msg:
+          - "=== Services disabled and packages removed ==="
+          - "Audio, desktop and Bluetooth packages have been purged"
+          - "Camera packages remain untouched"
+          - "Reboot recommended to apply all changes"
+
+    - name: Reboot to apply changes
+      reboot:
+        msg: "Rebooting to apply service and package changes"
+        reboot_timeout: 300
+#       when: purge_result.changed

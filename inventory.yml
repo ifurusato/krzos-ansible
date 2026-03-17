@@ -1,3 +1,13 @@
+# Copyright 2026 by Ichiro Furusato. All rights reserved. This file is
+# part of the krzos-ansible project, released under the MIT License.
+# Please see the LICENSE file included as part of this package.
+#
+# author:   Ichiro Furusato
+# created:  2026-03-18
+# modified: 2026-03-18
+#
+# inventory.yml — use this file after the ssh key has been configured on the Pi.
+
 all:
   hosts:
     krzos-pi:

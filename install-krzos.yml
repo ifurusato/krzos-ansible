@@ -1,4 +1,15 @@
-- name: Install KRZOS
+---
+# Copyright 2026 by Ichiro Furusato. All rights reserved. This file is
+# part of the krzos-ansible project, released under the MIT License.
+# Please see the LICENSE file included as part of this package.
+#
+# author:   Ichiro Furusato
+# created:  2026-03-18
+# modified: 2026-03-18
+#
+# install-krzos.yml — clone KRZOS from GitHub Repository
+
+- name: Install KRZOS from GitHub Repository
   hosts: all
   become: yes
   tasks:
@@ -17,7 +28,7 @@
         version: main
         force: yes
         accept_hostkey: yes
-      become: no  # Must run as pi, not root, to use pi's SSH key
-      # Requires SSH key to be present - run setup-pi.yml first
+        key_file: /home/pi/.ssh/id_rsa_github
+      become_user: pi
 
 #EOF

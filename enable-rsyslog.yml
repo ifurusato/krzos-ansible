@@ -1,3 +1,14 @@
+---
+# Copyright 2026 by Ichiro Furusato. All rights reserved. This file is
+# part of the krzos-ansible project, released under the MIT License.
+# Please see the LICENSE file included as part of this package.
+#
+# author:   Ichiro Furusato
+# created:  2026-03-18
+# modified: 2026-03-18
+#
+# enable-rsyslog.yml — replace journald with rsyslog
+
 - name: Enable classic text logging (rsyslog)
   hosts: all
   become: yes
@@ -34,22 +45,21 @@
         name: systemd-journald
         state: restarted
 
-    - name: Show rsyslog status (first 10 lines)
-      debug:
-        msg: "{{ rsyslog_status.stdout_lines[0:10] }}"
+    - name: Get rsyslog status
       command: systemctl --no-pager --full status rsyslog
       register: rsyslog_status
       ignore_errors: yes
 
-    - debug:
+    - name: Show rsyslog status (first 10 lines)
+      debug:
         msg: "{{ rsyslog_status.stdout_lines[0:10] }}"
 
-    - name: Show current journald disk usage
-      debug:
-        msg: "{{ journal_usage.stdout }}"
+    - name: Get current journald disk usage
       command: journalctl --disk-usage
       register: journal_usage
       ignore_errors: yes
 
-    - debug:
+    - name: Show journald disk usage
+      debug:
         msg: "{{ journal_usage.stdout }}"
+

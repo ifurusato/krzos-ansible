@@ -17,7 +17,8 @@ Repository Structure
 ::
 
     krzos-ansible/
-    ├── inventory.yml              # Defines the Pi host and connection settings
+    ├── bootstrap-inventory.yml    # Defines Pi host and connection settings for username/password connection
+    ├── inventory.yml              # Defines the Pi host and connection settings using shared a ssh key
     ├── site.yml                   # Master playbook: runs all playbooks in order
     ├── setup-pi.yml               # Base system setup
     ├── enable-rsyslog.yml         # Replaces journald with classic text logging
@@ -33,12 +34,12 @@ Repository Structure
         ├── .vimrc                 # Vim configuration
         └── motd                   # Message of the day
 
----
 
 Desktop Setup
 =============
 Ansible runs on your desktop (the control node) and connects to the Pi over SSH.
 The Pi itself does not need Ansible installed.
+
 
 1. Install Ansible
 ------------------
@@ -51,6 +52,7 @@ Run the provided script to install Ansible into a Python virtual environment:
 
 This creates ``~/ansible-venv/`` and installs current Ansible into it, and
 creates ``~/.ansible_env.sh`` and ``~/.ansible_env.csh`` for shell integration.
+
 
 2. Configure Your Shell
 -----------------------
@@ -75,9 +77,10 @@ Then reload your rc file:
     source ~/.cshrc    # tcsh
     source ~/.bashrc   # bash
 
+
 3. Configure the Inventory
 --------------------------
-Edit ``inventory.yml`` to match your Pi's IP address:
+Edit ``bootsrap-inventory.yml`` and ``inventory.yml`` to match your Pi's IP address:
 
 .. code-block:: yaml
 
@@ -88,6 +91,12 @@ Edit ``inventory.yml`` to match your Pi's IP address:
           ansible_user: pi
           ansible_ssh_private_key_file: ~/.ssh/id_rsa
           ansible_python_interpreter: /usr/bin/python3
+
+The ``bootstrap-inventory.yml`` version is used prior to copying the ssh key
+to the Pi. You'll need to modify your .bashrc or .cshrc to set the Pi's password
+as an environment variable, or just modify the YAML if including that password
+in the file is not a security issue.
+
 
 4. Add GitHub Deploy Key
 ------------------------
@@ -101,7 +110,6 @@ KRZOS GitHub repository.
 - Leave **Allow write access** unchecked
 - Click **Add key**
 
----
 
 Prior to First Boot
 ===================
@@ -109,6 +117,7 @@ Before flashing the SD card, use **Raspberry Pi Imager** to configure the Pi
 for headless operation. This is the supported method on Raspberry Pi OS Bookworm
 and later — the old ``wpa_supplicant.conf`` and ``ssh`` file approach no longer
 works.
+
 
 1. Flash Raspberry Pi OS
 ------------------------
@@ -124,6 +133,7 @@ works.
   - **Locale** → set your timezone and keyboard layout
 
 - Click **Save** then **Write** to flash the SD card
+
 
 2. First Boot
 -------------
@@ -143,7 +153,6 @@ IP address from your router's DHCP client list and connect directly:
 
     ssh pi@192.168.1.xx
 
----
 
 First Boot Manual Configuration
 ================================
@@ -158,10 +167,12 @@ Interface Options
 -----------------
 Enable the interfaces required by your robot:
 
+- **SSH** → enable (required for remote access)
 - **I2C** → enable (required for I2C sensors and devices)
 - **SPI** → enable (required for SPI devices)
 - **Serial Port** → enable only if using UART; disable serial console if not needed
 - **Camera** → enable only if using a Raspberry Pi camera
+
 
 Advanced Options
 ----------------
@@ -173,7 +184,6 @@ After finishing, exit ``raspi-config`` and reboot if prompted:
 
     sudo reboot
 
----
 
 Bootstrap the Pi
 ================
@@ -185,7 +195,11 @@ Python prerequisites required by Ansible:
     scp ansible-bootstrap.sh pi@krzos-pi.local:~
     ssh pi@krzos-pi.local "sudo bash ansible-bootstrap.sh"
 
----
+Alternately, you can just run the two command lines::
+
+    sudo apt update
+    sudo apt install -y python3 python3-pip python3-venv python3-six
+
 
 Running the Playbooks
 =====================
@@ -195,7 +209,22 @@ From your desktop, verify connectivity to the Pi first:
 
     ansible -i inventory.yml all -m ping
 
-You should see a green ``pong`` response. Then run the full setup:
+You should see a green ``pong`` response. 
+
+If the ansible ping fails you may need to manually connect to the Pi remotely
+from the host machine in order to determine if the ssh key is being correctly
+associated with the new Raspberry Pi. If that same IP address has been used
+before on the LAN you may see a very threatening message starting with::
+
+    @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+    @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+
+...where you'd then be asked to clear the older key in order to connect to the
+new Raspberry Pi.
+
+If the ping succeeds you then run the full setup:
 
 .. code-block:: bash
 
@@ -209,9 +238,10 @@ Or run individual playbooks as needed:
     ansible-playbook -i inventory.yml enable-rsyslog.yml
     ansible-playbook -i inventory.yml install-krzos.yml
 
-If you want to set up a Raspberry Pi but not clone the krzos github repository,
-you can either comment out or delete that last line. Or modify that playbook to
-clone a different repo.
+If you want to set up a Raspberry Pi but not clone the krzos github repository
+using site.yml, you can either comment out or delete that last line. Or modify
+that playbook to clone a different repo. Or just run the first two playbooks
+separately.
 
 To do a dry run without making any changes:
 
@@ -219,7 +249,6 @@ To do a dry run without making any changes:
 
     ansible-playbook -i inventory.yml site.yml --check
 
----
 
 Playbook Summary
 ================
