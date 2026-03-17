@@ -12,6 +12,8 @@
 - name: Setup KRZOS Raspberry Pi
   hosts: all
   become: yes
+  vars:
+    raspi_config: /usr/bin/raspi-config
   tasks:
     - name: Update apt cache and upgrade packages
       apt:
@@ -52,6 +54,41 @@
         line: '127.0.1.1       krzos-pi'
       register: hosts_result
 
+    - name: Enable I2C interface
+      command: "{{ raspi_config }} nonint do_i2c 0"
+      register: i2c_result
+      changed_when: i2c_result.rc == 0
+
+    - name: Enable SPI interface
+      command: "{{ raspi_config }} nonint do_spi 0"
+      register: spi_result
+      changed_when: spi_result.rc == 0
+
+    - name: Enable Serial Port hardware
+      command: "{{ raspi_config }} nonint do_serial_hw 0"
+      register: serial_hw_result
+      changed_when: serial_hw_result.rc == 0
+
+    - name: Disable Serial Console
+      command: "{{ raspi_config }} nonint do_serial_cons 1"
+      register: serial_cons_result
+      changed_when: serial_cons_result.rc == 0
+
+    - name: Enable Camera interface
+      command: "{{ raspi_config }} nonint do_camera 0"
+      register: camera_result
+      changed_when: camera_result.rc == 0
+
+    - name: Enable auto-login on console
+      command: "{{ raspi_config }} nonint do_boot_behaviour B2"
+      register: autologin_result
+      changed_when: autologin_result.rc == 0
+
+    - name: Expand filesystem to use full SD card
+      command: "{{ raspi_config }} nonint do_expand_rootfs"
+      register: expand_result
+      changed_when: expand_result.rc == 0
+
     - name: Copy dotfiles to pi home
       copy:
         src: files/{{ item }}
@@ -67,6 +104,28 @@
         - .prompt
         - .vimrc
       register: dotfiles_result
+
+    - name: Ensure bin directory exists
+      file:
+        path: /home/pi/bin
+        state: directory
+        owner: pi
+        group: pi
+        mode: '0755'
+
+    - name: Copy executable scripts to bin
+      copy:
+        src: files/bin/{{ item }}
+        dest: /home/pi/bin/{{ item }}
+        owner: pi
+        group: pi
+        mode: '0755'
+      loop:
+        - findpy
+        - ipaddress.py
+        - rsh
+        - rsh
+        - scanip
 
     - name: Copy motd
       copy:
@@ -98,35 +157,21 @@
         key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
       register: ssh_key_result
 
-    - name: Generate SSH key for GitHub (if not exists)
-      openssh_keypair:
-        path: /home/pi/.ssh/id_rsa_github
-        type: rsa
-        size: 4096
+    - name: Copy GitHub SSH private key to Pi
+      copy:
+        src: ~/.ssh/id_rsa
+        dest: /home/pi/.ssh/id_rsa
         owner: pi
         group: pi
         mode: '0600'
-        comment: "pi@krzos-pi"
-      register: github_key
 
-    - name: Display GitHub public key for adding to GitHub
-      debug:
-        msg: 
-          - "=== ADD THIS PUBLIC KEY TO GITHUB ==="
-          - "{{ github_key.public_key }}"
-          - ""
-          - "Go to: https://github.com/ifurusato/krzos/settings/keys"
-          - "Click 'Add deploy key'"
-          - "Paste the key above"
-          - "Check 'Allow write access' if you need to push"
-      when: github_key.changed
-
-    - name: Configure git to use GitHub SSH key
-      community.general.git_config:
-        name: core.sshCommand
-        value: 'ssh -i /home/pi/.ssh/id_rsa_github -o IdentitiesOnly=yes'
-        scope: global
-      become_user: pi
+    - name: Copy GitHub SSH public key to Pi
+      copy:
+        src: ~/.ssh/id_rsa.pub
+        dest: /home/pi/.ssh/id_rsa.pub
+        owner: pi
+        group: pi
+        mode: '0644'
 
     - name: Install rshell via pip3
       pip:

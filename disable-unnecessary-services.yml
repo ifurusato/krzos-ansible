@@ -35,7 +35,6 @@
     
     packages_to_remove:
       - x11-common
-      - raspi-ui-mods
       - lxde-*
       - lxpanel-*
       - pulseaudio*

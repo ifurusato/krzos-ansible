@@ -207,13 +207,9 @@ required for KRZOS using ``raspi-config``:
 
 Interface Options
 -----------------
-Enable the interfaces required by your robot:
+Enable the SSH interface required by Ansible:
 
 - **SSH** → enable (required for remote access)
-- **I2C** → enable (required for I2C sensors and devices)
-- **SPI** → enable (required for SPI devices)
-- **Serial Port** → enable only if using UART; disable serial console if not needed
-- **Camera** → enable only if using a Raspberry Pi camera
 
 
 Advanced Options
@@ -249,7 +245,7 @@ Running the Playbooks
 Initial Setup Workflow
 ---------------------
 The first time you set up a fresh Pi, you must use ``bootstrap-inventory.yml``
-because the Pi doesn't have your SSH key yet.
+because the Pi doesn't have your SSH key yet and requires password authentication.
 
 **1. Test connectivity with password authentication:**
 
@@ -265,37 +261,33 @@ because the Pi doesn't have your SSH key yet.
 
 You should see a green ``pong`` response.
 
-**2. Run the initial setup:**
+**2. Run the complete initial setup:**
 
 .. code-block:: bash
 
     ansible-playbook -i bootstrap-inventory.yml site.yml
 
-This will:
+This single command runs all playbooks in order and will:
 
 - Install system packages and Python libraries
 - Copy dotfiles and configure the shell
-- **Generate a GitHub deploy key on the Pi**
-- Copy your desktop SSH public key to the Pi for future connections
+- Copy your desktop SSH key to the Pi for future connections
 - Configure passwordless sudo
-- Install rsyslog and disable unnecessary services
+- Enable hardware interfaces (I2C, SPI, Serial, Camera)
+- Configure auto-login on console
+- Expand filesystem to use full SD card
+- Remove unnecessary packages (audio, desktop, Bluetooth)
+- Install rsyslog and configure logging
 - Clone the KRZOS repository
-- Reboot the Pi
+- Reboot the Pi when complete
 
-**3. Add the GitHub deploy key:**
+The entire process uses password authentication. Even though the SSH key is
+copied early in the process, it won't be used until subsequent runs.
 
-During the ``setup-pi.yml`` playbook run, a public key will be displayed in
-the output. Copy this key and add it to GitHub:
+**3. Verify SSH key authentication after reboot:**
 
-- Go to https://github.com/ifurusato/krzos/settings/keys
-- Click **Add deploy key**
-- Paste the public key
-- **Check "Allow write access"** (needed for git push)
-- Click **Add key**
-
-**4. Verify SSH key authentication works:**
-
-After the Pi reboots, test that key-based authentication works:
+Once the Pi reboots (which happens automatically), test that key-based
+authentication works:
 
 .. code-block:: bash
 
@@ -311,7 +303,7 @@ playbook runs:
 
 .. code-block:: bash
 
-    ansible -playbook -i inventory.yml site.yml
+    ansible-playbook -i inventory.yml site.yml
 
 Or run individual playbooks as needed:
 
@@ -321,6 +313,8 @@ Or run individual playbooks as needed:
     ansible-playbook -i inventory.yml disable-unnecessary-services.yml
     ansible-playbook -i inventory.yml enable-rsyslog.yml
     ansible-playbook -i inventory.yml install-krzos.yml
+
+These commands use SSH key authentication and do not require a password.
 
 
 Troubleshooting

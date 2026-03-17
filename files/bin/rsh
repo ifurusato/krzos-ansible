@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# configuration: set to "lowest" or "highest"
+SELECT_POLICY="lowest"
+
+# Optional: override device prefix if needed
+DEVICE_PREFIX="/dev/ttyACM"
+
+# Gather matching devices safely
+mapfile -t DEVICES < <(ls ${DEVICE_PREFIX}[0-9]* 2>/dev/null || true)
+
+if [ ${#DEVICES[@]} -eq 0 ]; then
+    echo "No ${DEVICE_PREFIX} devices found."
+    exit 1
+fi
+
+# sort numerically by suffix
+IFS=$'\n' SORTED=($(printf "%s\n" "${DEVICES[@]}" | sort -V))
+unset IFS
+
+case "$SELECT_POLICY" in
+    lowest)
+        SELECTED="${SORTED[0]}"
+        ;;
+    highest)
+        SELECTED="${SORTED[-1]}"
+        ;;
+    *)
+        echo "Invalid SELECT_POLICY: $SELECT_POLICY"
+        exit 1
+        ;;
+esac
+
+echo "starting rshell on $SELECTED"
+
+exec rshell -p "$SELECTED"
+
+#EOF

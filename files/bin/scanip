@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# A shell over the linux nmap command, with colorised output.
+#
+# Scans IP addresses on the local network.
+#
+# Copyright 2020 by Murray Altheim. All rights reserved. This file is part of
+# the Robot Operating System project and is released under the "Apache Licence, 
+# Version 2.0". Please see the LICENSE file included as part of this package.
+#
+# author:   Murray Altheim
+# created:  2021-02-11
+# modified: 2021-02-03
+
+import os, sys, subprocess, traceback
+import pprint
+from os import path
+#from os.path import expanduser
+from colorama import init, Fore, Style
+init()
+
+try:
+    import yaml
+except ImportError:
+    exit("This script requires the pyyaml module\nInstall with: pip3 install --user pyyaml")
+
+print(Fore.CYAN + Style.DIM + '-- scanning IP addresses...' + Style.RESET_ALL)
+command = 'nmap -sn 192.168.1.0/24'
+print(Fore.CYAN + Style.DIM + '-- command: \"{}\"...\n'.format(command) + Style.RESET_ALL)
+
+# ..............................................................................
+def read_yaml_config(filename):
+    '''
+    Reads the YAML file, returning its content as a dictionary.
+    '''
+    print(Fore.CYAN + 'reading from yaml configuration file {}...'.format(filename) + Style.RESET_ALL)
+    _config = yaml.safe_load(open(filename, 'r'))
+    print('YAML configuration as read:')
+    print(Fore.BLUE)
+    pp = pprint.PrettyPrinter(width=80, indent=2)
+    pp.pprint(_config)
+    print(Style.RESET_ALL)
+    print(Fore.CYAN + 'configuration read.' + Style.RESET_ALL)
+    return _config
+    
+# ..............................................................................
+def main(argv):
+
+    _prefix = 'Nmap scan report for'
+
+    try:
+
+        _host_config = None
+        # get configuration file
+        _home = path.expanduser("~")
+        _filename = '.known_hosts.yml'
+        _filepath = os.path.join(_home, _filename)
+        if path.exists(_filepath):
+            _config = read_yaml_config(_filepath)
+            _host_config = _config['host']
+        else:
+            print(Fore.CYAN + 'could not find configuration file: {}"'.format(_filepath) + Style.RESET_ALL)
+
+        proc = subprocess.Popen([command], stdout=subprocess.PIPE,universal_newlines=True, shell=True)
+        count = 0
+        for line in proc.stdout:
+            count += 1
+            _line = str(line).strip()
+            if _line.startswith(_prefix):
+                _ip = _line[len(_prefix)+1:]
+                print(Fore.CYAN + _prefix + Fore.YELLOW + '\t"{}"'.format(_ip) + Style.RESET_ALL)
+            else:
+                print(Fore.BLACK + '{}'.format(_line) + Style.RESET_ALL)
+                
+        print(Fore.CYAN + Style.DIM + '\n-- complete: {:d} lines returned.'.format(count) + Style.RESET_ALL)
+    except Exception as e:
+        print(Fore.RED + Style.BRIGHT + 'error starting ros: {}\n{}'.format(e, traceback.format_exc()) + Style.RESET_ALL)
+        sys.exit(1)
+        
+# call main ....................................................................
+
+if __name__== "__main__":
+    main(sys.argv[1:])
+    
