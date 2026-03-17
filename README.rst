@@ -8,6 +8,7 @@ It handles:
 - Deploying system packages and Python libraries
 - Copying custom home directory dotfiles
 - Configuring the system hostname and logging
+- Disabling unnecessary services for headless operation
 - Cloning the KRZOS GitHub repository
 - Configuring SSH keys for GitHub access
 
@@ -17,28 +18,47 @@ Repository Structure
 ::
 
     krzos-ansible/
-    ├── bootstrap-inventory.yml    # Defines Pi host and connection settings for username/password connection
-    ├── inventory.yml              # Defines the Pi host and connection settings using shared a ssh key
-    ├── site.yml                   # Master playbook: runs all playbooks in order
-    ├── setup-pi.yml               # Base system setup
-    ├── enable-rsyslog.yml         # Replaces journald with classic text logging
-    ├── install-krzos.yml          # Clones the KRZOS repository
-    ├── install-ansible.sh         # Run on desktop: installs Ansible into a venv
-    ├── ansible-bootstrap.sh       # Run on Pi: installs Python prerequisites
+    ├── bootstrap-inventory.yml         # Password-based connection for first-time setup
+    ├── inventory.yml                   # SSH key-based connection for normal use
+    ├── site.yml                        # Master playbook: runs all setup playbooks in order
+    ├── setup-pi.yml                    # Base system setup, SSH key configuration
+    ├── disable-unnecessary-services.yml # Removes audio, desktop, and Bluetooth packages
+    ├── enable-rsyslog.yml              # Replaces journald with classic text logging
+    ├── install-krzos.yml               # Clones the KRZOS repository
+    ├── install-ansible.sh              # Run on desktop: installs Ansible into a venv
+    ├── ansible-bootstrap.sh            # Run on Pi: installs Python prerequisites
     └── files/
-        ├── .aliases               # CLI aliases
-        ├── .cshrc                 # tcsh shell configuration
-        ├── .dir_colors            # Directory colour configuration
-        ├── .LSCOLORS              # ls colour configuration
-        ├── .prompt                # Shell prompt configuration
-        ├── .vimrc                 # Vim configuration
-        └── motd                   # Message of the day
+        ├── .aliases                    # CLI aliases
+        ├── .cshrc                      # tcsh shell configuration
+        ├── .dir_colors                 # Directory colour configuration
+        ├── .LSCOLORS                   # ls colour configuration
+        ├── .prompt                     # Shell prompt configuration
+        ├── .vimrc                      # Vim configuration
+        └── motd                        # Message of the day
 
 
 Desktop Setup
 =============
 Ansible runs on your desktop (the control node) and connects to the Pi over SSH.
 The Pi itself does not need Ansible installed.
+
+
+Prerequisites
+-------------
+Install ``sshpass`` on your desktop (required for password-based authentication
+during initial setup):
+
+**Debian/Ubuntu:**
+
+.. code-block:: bash
+
+    sudo apt install sshpass
+
+**macOS:**
+
+.. code-block:: bash
+
+    brew install hudochenkov/sshpass/sshpass
 
 
 1. Install Ansible
@@ -78,9 +98,25 @@ Then reload your rc file:
     source ~/.bashrc   # bash
 
 
-3. Configure the Inventory
---------------------------
-Edit ``bootsrap-inventory.yml`` and ``inventory.yml`` to match your Pi's IP address:
+3. Configure the Inventories
+----------------------------
+Edit both ``bootstrap-inventory.yml`` and ``inventory.yml`` to match your Pi's
+IP address.
+
+**bootstrap-inventory.yml** (for first-time setup):
+
+.. code-block:: yaml
+
+    all:
+      hosts:
+        krzos-pi:
+          ansible_host: 192.168.1.xx    # replace with your Pi's IP address
+          ansible_user: pi
+          ansible_ssh_pass: "{{ lookup('env', 'PI_PASSWORD') }}"
+          ansible_become_pass: "{{ lookup('env', 'PI_PASSWORD') }}"
+          ansible_python_interpreter: /usr/bin/python3
+
+**inventory.yml** (for normal use after SSH keys are configured):
 
 .. code-block:: yaml
 
@@ -92,23 +128,25 @@ Edit ``bootsrap-inventory.yml`` and ``inventory.yml`` to match your Pi's IP addr
           ansible_ssh_private_key_file: ~/.ssh/id_rsa
           ansible_python_interpreter: /usr/bin/python3
 
-The ``bootstrap-inventory.yml`` version is used prior to copying the ssh key
-to the Pi. You'll need to modify your .bashrc or .cshrc to set the Pi's password
-as an environment variable, or just modify the YAML if including that password
-in the file is not a security issue.
 
+4. Set Pi Password Environment Variable
+---------------------------------------
+For the bootstrap setup, set the Pi's password as an environment variable.
 
-4. Add GitHub Deploy Key
-------------------------
-The ``install-krzos.yml`` playbook clones a private GitHub repository using
-SSH. You need to register your desktop SSH public key as a deploy key on the
-KRZOS GitHub repository.
+**tcsh** (add to ``~/.cshrc``):
 
-- Go to the KRZOS repository on GitHub
-- Navigate to **Settings → Deploy keys → Add deploy key**
-- Paste the contents of ``~/.ssh/id_rsa.pub``
-- Leave **Allow write access** unchecked
-- Click **Add key**
+.. code-block:: csh
+
+    setenv PI_PASSWORD 'your_raspberry_pi_password'
+
+**bash** (add to ``~/.bashrc``):
+
+.. code-block:: bash
+
+    export PI_PASSWORD='your_raspberry_pi_password'
+
+**Note:** Only needed for initial setup with ``bootstrap-inventory.yml``.
+After SSH keys are configured, this is no longer required.
 
 
 Prior to First Boot
@@ -127,12 +165,16 @@ works.
 - Click the **gear icon** (Advanced Options) before flashing and configure:
 
   - **Hostname** → e.g. ``krzos-pi``
-  - **Enable SSH** → enable; select *Allow public-key authentication only*
+  - **Enable SSH** → enable; select *Use password authentication*
   - **Username and password** → set username to ``pi`` and a secure password
   - **WiFi** → enter your SSID, password, and country code (e.g. ``NZ``)
   - **Locale** → set your timezone and keyboard layout
 
 - Click **Save** then **Write** to flash the SD card
+
+**Important:** Use *password authentication* in the imager settings, not
+public-key authentication. The Ansible playbooks will configure SSH keys
+automatically during setup.
 
 
 2. First Boot
@@ -203,47 +245,126 @@ Alternately, you can just run the two command lines::
 
 Running the Playbooks
 =====================
-From your desktop, verify connectivity to the Pi first:
+
+Initial Setup Workflow
+---------------------
+The first time you set up a fresh Pi, you must use ``bootstrap-inventory.yml``
+because the Pi doesn't have your SSH key yet.
+
+**1. Test connectivity with password authentication:**
+
+.. code-block:: bash
+
+    # tcsh
+    setenv PI_PASSWORD 'your_password'
+    ansible -i bootstrap-inventory.yml all -m ping
+
+    # bash
+    export PI_PASSWORD='your_password'
+    ansible -i bootstrap-inventory.yml all -m ping
+
+You should see a green ``pong`` response.
+
+**2. Run the initial setup:**
+
+.. code-block:: bash
+
+    ansible-playbook -i bootstrap-inventory.yml site.yml
+
+This will:
+
+- Install system packages and Python libraries
+- Copy dotfiles and configure the shell
+- **Generate a GitHub deploy key on the Pi**
+- Copy your desktop SSH public key to the Pi for future connections
+- Configure passwordless sudo
+- Install rsyslog and disable unnecessary services
+- Clone the KRZOS repository
+- Reboot the Pi
+
+**3. Add the GitHub deploy key:**
+
+During the ``setup-pi.yml`` playbook run, a public key will be displayed in
+the output. Copy this key and add it to GitHub:
+
+- Go to https://github.com/ifurusato/krzos/settings/keys
+- Click **Add deploy key**
+- Paste the public key
+- **Check "Allow write access"** (needed for git push)
+- Click **Add key**
+
+**4. Verify SSH key authentication works:**
+
+After the Pi reboots, test that key-based authentication works:
 
 .. code-block:: bash
 
     ansible -i inventory.yml all -m ping
 
-You should see a green ``pong`` response. 
+You should see a green ``pong`` response without needing to set ``PI_PASSWORD``.
 
-If the ansible ping fails you may need to manually connect to the Pi remotely
-from the host machine in order to determine if the ssh key is being correctly
-associated with the new Raspberry Pi. If that same IP address has been used
-before on the LAN you may see a very threatening message starting with::
 
-    @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
-    @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-    IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
-
-...where you'd then be asked to clear the older key in order to connect to the
-new Raspberry Pi.
-
-If the ping succeeds you then run the full setup:
+Normal Usage
+-----------
+After initial setup is complete, always use ``inventory.yml`` for all subsequent
+playbook runs:
 
 .. code-block:: bash
 
-    ansible-playbook -i inventory.yml site.yml
+    ansible -playbook -i inventory.yml site.yml
 
 Or run individual playbooks as needed:
 
 .. code-block:: bash
 
     ansible-playbook -i inventory.yml setup-pi.yml
+    ansible-playbook -i inventory.yml disable-unnecessary-services.yml
     ansible-playbook -i inventory.yml enable-rsyslog.yml
     ansible-playbook -i inventory.yml install-krzos.yml
 
-If you want to set up a Raspberry Pi but not clone the krzos github repository
-using site.yml, you can either comment out or delete that last line. Or modify
-that playbook to clone a different repo. Or just run the first two playbooks
-separately.
 
-To do a dry run without making any changes:
+Troubleshooting
+--------------
+
+**SSH Host Key Changed Warning:**
+
+If you see a threatening message about remote host identification when trying
+to connect to the Pi:
+
+.. code-block:: text
+
+    @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+    @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+    @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+This happens when you reuse an IP address that was previously assigned to a
+different Pi. Remove the old key from your known_hosts file:
+
+.. code-block:: bash
+
+    ssh-keygen -R 192.168.1.xx
+    # or
+    ssh-keygen -R krzos-pi.local
+
+Then reconnect normally.
+
+**Permission Denied (publickey) After Initial Setup:**
+
+If you can't connect with ``inventory.yml`` after running ``setup-pi.yml``,
+verify the SSH key was copied correctly:
+
+.. code-block:: bash
+
+    # tcsh
+    setenv PI_PASSWORD 'your_password'
+    ansible -i bootstrap-inventory.yml all -m shell -a "cat ~/.ssh/authorized_keys"
+
+Your desktop's public key should be listed there.
+
+
+Dry Run
+-------
+To see what changes would be made without actually applying them:
 
 .. code-block:: bash
 
@@ -253,13 +374,38 @@ To do a dry run without making any changes:
 Playbook Summary
 ================
 
-- **setup-pi.yml** — updates apt, installs system packages, copies dotfiles,
-  sets hostname, sets tcsh as default shell, copies SSH key, installs rshell,
-  adds pi user to dialout group.
-- **enable-rsyslog.yml** — installs rsyslog, configures journald for minimal
-  volatile operation, restores classic text-based logging to ``/var/log/``.
-- **install-krzos.yml** — creates the workspace directory and clones the KRZOS
-  repository from GitHub.
-- **site.yml** — runs all three playbooks in order.
+**setup-pi.yml**
+  Base system configuration: updates apt, installs system packages (git, vim,
+  tcsh, i2c-tools, python3-pip, python3-colorama, rshell), copies dotfiles,
+  sets hostname, sets tcsh as default shell, generates GitHub SSH deploy key,
+  copies desktop SSH public key to Pi, configures passwordless sudo, adds pi
+  user to dialout group, reboots if changes were made.
+
+**disable-unnecessary-services.yml**
+  Removes packages and disables services not needed for headless operation:
+  audio services (PulseAudio, PipeWire, ALSA), desktop environments (X11, LXDE),
+  Bluetooth stack, Avahi daemon, and ModemManager. Significantly reduces resource
+  usage and attack surface. Reboots to apply changes.
+
+**enable-rsyslog.yml**
+  Installs rsyslog, configures journald for minimal volatile operation (10MB
+  runtime limit), restores classic text-based logging to ``/var/log/``. Shows
+  rsyslog status and journald disk usage.
+
+**install-krzos.yml**
+  Creates the workspace directory (``/home/pi/workspaces/workspace-krzos/``) and
+  clones the KRZOS repository from GitHub using the deploy key generated by
+  ``setup-pi.yml``.
+
+**site.yml**
+  Master playbook that runs all setup playbooks in order: setup-pi.yml,
+  disable-unnecessary-services.yml, enable-rsyslog.yml, install-krzos.yml.
+
+
+License
+=======
+Copyright 2026 by Ichiro Furusato. All rights reserved. This project is
+released under the MIT License. Please see the LICENSE file included as
+part of this package.
 
 #EOF
