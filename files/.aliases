@@ -1,7 +1,6 @@
 # alias file called by .cshrc
 # created:  2006-03-27
 # modified: 2024-04-25
-# altheim
 
 alias ls '/bin/ls --color=auto'
 alias lsa 'ls -alF'
@@ -17,12 +16,7 @@ alias pud  'pushd'
 alias pod  'popd'
 alias rsrc 'source ~/.cshrc'
 alias cdk  'cd ~/workspaces/workspace-krzos/krzos/'
-alias cdm  'cd ~/workspaces/workspace-mros/mros/'
 alias shut 'sudo shutdown now'
 alias rs 'rshell -p /dev/ttyACM0'
-alias cdt 'cd ~/workspaces/workspace-tinyfx-i2c-target/tinyfx-i2c-target/'
-alias cdb 'cd ~/workspaces/workspace-bme690/bme690-python/examples/'
-alias cda 'cd ~/workspaces/workspace-air-quality-logger/'
 alias cdk 'cd ~/workspaces/workspace-krzos/krzos/'
-alias cds 'cd ~/workspaces/workspace-tinys3-i2c-target/tinys3-i2c-target'
 

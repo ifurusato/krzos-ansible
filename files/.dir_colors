@@ -48,7 +48,7 @@
 #  Yellow           \e[1;33m
 #  White            \e[1;37m
 
-# mods altheim: 2006-11-22
+# mods: 2006-11-22
 
 # COLOR needs one of these arguments: 'tty' colorizes output to ttys, but not
 # pipes. 'all' adds color characters to all output. 'none' shuts colorization
